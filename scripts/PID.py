@@ -18,7 +18,7 @@ class PID:
         self.current_time = time.time()
         self.last_time = self.current_time
 
-		slef.I_TERM_IS_ACTIVE = False
+	self.I_TERM_IS_ACTIVE = False
 
         self.clear()
 
@@ -67,8 +67,8 @@ class PID:
             # Remember last time and last error for next calculation
             self.last_time = self.current_time
             self.last_error = error
-			if not self.I_TERM_IS_ACTIVE:
-				self.ITerm = 0.0
+            if not self.I_TERM_IS_ACTIVE:
+                self.ITerm = 0.0
 
             self.output = self.PTerm + (self.Ki * self.ITerm) + (self.Kd * self.DTerm)
 
