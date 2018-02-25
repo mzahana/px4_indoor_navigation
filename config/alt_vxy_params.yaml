@@ -9,3 +9,7 @@ alt_Kd: 0.001
 # maximum vertical velocity, in absolute value, [m/s]
 MAX_VUP: 2.0
 MAX_VDOWN: 0.5
+
+# local vs. body setpoints
+# if True, will use body setpoint
+TRANSFOR_VEL: True

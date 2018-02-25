@@ -3,6 +3,8 @@ import PID
 import rospy
 from geometry_msgs.msg import Point, PoseStamped
 from mavros_msgs.msg import *
+import tf
+from math import sin, cos
 
 class Controller:
 	""" Implements an altitude PID controller using velocity commands.
@@ -25,6 +27,8 @@ class Controller:
 
 		# flying altitude
 		self.ALT_SP = rospy.get_param("alt_sp", 1.0)
+		# altityde at ground
+		self.zero_ALT = 0.0
 		# maximum velocity setpoints
 		self.MAX_VUP = rospy.get_param("MAX_VUP", 2.0)
 		self.MAX_VDOWN = rospy.get_param("MAX_VDOWN", 0.5)
@@ -36,6 +40,16 @@ class Controller:
 		self.sp.velocity.y = 0.
 		self.sp.velocity.z = 0.
 		self.sp.yaw = 0.
+		# whether to give velocity w.r.t body/local frame
+		# if ture will use body frame
+		self.TRANSFORM_VEL = rospy.get_param("TRANSFORM_VEL", True)
+		if self.TRANSFORM_VEL:
+			rospy.logwarn("Using body setpoints")
+		else:
+			rospy.logwarn("Using local setpoints")
+
+		# current yaw [rad]
+		self.yaw = 0.0
 		
 		# message for current position of the drone
 		self.local_pos = Point(0.0, 0.0, 0.0)
@@ -53,6 +67,10 @@ class Controller:
 		self.local_pos.x = msg.pose.position.x
 		self.local_pos.y = msg.pose.position.y
 		self.local_pos.z = msg.pose.position.z
+		
+		q = (msg.pose.orientation.x,msg.pose.orientation.y,msg.pose.orientation.z,msg.pose.orientation.w)
+		euler = tf.transformations.euler_from_quaternion(q, 'rzyx') #yaw/pitch/roll
+		self.yaw = euler[0]
 
 	def spCb(self, msg):
 		self.vxsp = msg.x
@@ -72,7 +90,7 @@ class Controller:
 		self.pid.setKd(msg.z)
 
 	def update(self):
-		error = self.ALT_SP - self.local_pos.z
+		error = self.ALT_SP + self.zero_ALT - self.local_pos.z
 
 		self.pid.SetPoint = self.ALT_SP
 		if self.IS_ARMED and self.LANDED_STATE > 1 and slef.state == "OFFBOARD":
@@ -87,8 +105,15 @@ class Controller:
                 if self.sp.velocity.z < -1.0*self.MAX_VDOWN:
                         self.sp.velocity.z = -1.0*self.MAX_VDOWN
 
-		self.sp.velocity.x = self.vxsp
-		self.sp.velocity.y = self.vysp
+		if self.TRANSFORM_VEL:
+			vx_t = cos(self.yaw)*self.vxsp + sin(self.yaw)*self.vysp
+			vy_t = -sin(self.yaw)*self.vxsp + cos(self.yaw)*self.vysp
+			
+			self.sp.velocity.x = vx_t
+			self.sp.velocity.y = vy_t
+		else:
+			self.sp.velocity.x = self.vxsp
+			self.sp.velocity.y = self.vysp
 
 def main():
 	# intiate node
@@ -109,7 +134,12 @@ def main():
 
 	# Setpoint publisher    
 	sp_pub = rospy.Publisher('mavros/setpoint_raw/local', PositionTarget, queue_size=1)
-
+	
+	k = 0
+	while not rospy.is_shutdown() and k < 1000:
+		cnt.zero_ALT  = cnt.local_pos.z
+		k = k+1
+	rospy.logwarn("Zero altitude is acquired!")
 	while not rospy.is_shutdown():
 		cnt.update()
 		sp_pub.publish(cnt.sp)
