@@ -16,3 +16,5 @@ TRANSFORM_VEL: True
 
 # If True, OFFBOARD mode will be activated from code
 set_offb: True
+
+autoTO: True

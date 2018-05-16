@@ -92,6 +92,9 @@ class Controller:
 		# set frame type, LOCAL_NED
 		self.sp.coordinate_frame= 1
 
+		# for takingoff right after launch
+		self.autoTO = rospy.get_param("autoTO", False)
+
 		# flying altitude
 		self.ALT_SP = rospy.get_param("alt_sp", 1.0)
 		# altityde at ground
@@ -143,6 +146,23 @@ class Controller:
 
 	def landCb(self, msg):
 		self.mode.setAutoLandMode()
+
+	def landAllCb(self, msg):
+		self.mode.setAutoLandMode()
+
+	def toAllCb(self, msg):
+		self.vxsp = 0.0
+		self.vysp = 0.0
+
+		self.mode.setArm()
+		self.mode.setOffboardMode()
+
+	def toCb(self, msg):
+		self.vxsp = 0.0
+		self.vysp = 0.0
+
+		self.mode.setArm()
+		self.mode.setOffboardMode()
 
 	def posCb(self, msg):
 		self.local_pos.x = msg.pose.position.x
@@ -221,6 +241,9 @@ def main():
 	rospy.Subscriber("disarm", Empty, cnt.disarmCb)
 	rospy.Subscriber("land", Empty, cnt.landCb)
 	rospy.Subscriber("offb", Empty, cnt.offbCb)
+	rospy.Subscriber("/land", Empty, cnt.landAllCb)	 # global topic; used to land all drones at once
+	rospy.Subscriber("/takeoff", Empty, cnt.toAllCb)	 # global topic; used to takeoff all drones at once
+	rospy.Subscriber("takeoff", Empty, cnt.toCb)
 
 	# Setpoint publisher    
 	sp_pub = rospy.Publisher('mavros/setpoint_raw/local', PositionTarget, queue_size=1)
@@ -232,6 +255,16 @@ def main():
 		k = k+1
 		rate.sleep()
 	rospy.logwarn("Zero altitude/yaw is acquired!")
+
+	# for auto takeoff
+	if cnt.autoTO:
+		cnt.vxsp = 0.0
+		cnt.vysp = 0.0
+		cnt.update()
+		cnt.mode.setArm()
+		cnt.mode.setOffboardMode()
+		cnt.autoTO = False
+
 	rospy.logwarn("zero_Alt= %s , zero_yaw= %s", cnt.zero_ALT, cnt.zero_yaw)
 	while not rospy.is_shutdown():
 		cnt.update()
