@@ -12,4 +12,7 @@ MAX_VDOWN: 0.5
 
 # local vs. body setpoints
 # if True, will use body setpoint
-TRANSFOR_VEL: True
+TRANSFORM_VEL: True
+
+# If True, OFFBOARD mode will be activated from code
+set_offb: True

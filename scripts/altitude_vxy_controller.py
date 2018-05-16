@@ -3,14 +3,81 @@ import PID
 import rospy
 from geometry_msgs.msg import Point, PoseStamped
 from mavros_msgs.msg import *
+from mavros_msgs.srv import *
+from std_msgs.msg import Empty
 import tf
 from math import sin, cos, pi
+
+class FcuModes:
+	def __init__(self):
+		pass
+
+	def setArm(self):
+		rospy.wait_for_service('mavros/cmd/arming')
+		try:
+			armService = rospy.ServiceProxy('mavros/cmd/arming', mavros_msgs.srv.CommandBool)
+			armService(True)
+		except rospy.ServiceException, e:
+			print "Service arming call failed: %s"%e
+
+	def setDisarm(self):
+		rospy.wait_for_service('mavros/cmd/arming')
+		try:
+			armService = rospy.ServiceProxy('mavros/cmd/arming', mavros_msgs.srv.CommandBool)
+			armService(False)
+		except rospy.ServiceException, e:
+			print "Service disarming call failed: %s"%e
+
+	def setStabilizedMode(self):
+		rospy.wait_for_service('mavros/set_mode')
+		try:
+			flightModeService = rospy.ServiceProxy('mavros/set_mode', mavros_msgs.srv.SetMode)
+			flightModeService(custom_mode='STABILIZED')
+		except rospy.ServiceException, e:
+			print "service set_mode call failed: %s. Stabilized Mode could not be set."%e
+
+	def setOffboardMode(self):
+		rospy.wait_for_service('mavros/set_mode')
+		try:
+			flightModeService = rospy.ServiceProxy('mavros/set_mode', mavros_msgs.srv.SetMode)
+			flightModeService(custom_mode='OFFBOARD')
+		except rospy.ServiceException, e:
+			print "service set_mode call failed: %s. Offboard Mode could not be set."%e
+
+	def setAltitudeMode(self):
+		rospy.wait_for_service('mavros/set_mode')
+		try:
+			flightModeService = rospy.ServiceProxy('mavros/set_mode', mavros_msgs.srv.SetMode)
+			flightModeService(custom_mode='ALTCTL')
+		except rospy.ServiceException, e:
+			print "service set_mode call failed: %s. Altitude Mode could not be set."%e
+
+	def setPositionMode(self):
+		rospy.wait_for_service('mavros/set_mode')
+		try:
+			flightModeService = rospy.ServiceProxy('mavros/set_mode', mavros_msgs.srv.SetMode)
+			flightModeService(custom_mode='POSCTL')
+		except rospy.ServiceException, e:
+			print "service set_mode call failed: %s. Position Mode could not be set."%e
+
+	def setAutoLandMode(self):
+		rospy.wait_for_service('mavros/set_mode')
+		try:
+			flightModeService = rospy.ServiceProxy('mavros/set_mode', mavros_msgs.srv.SetMode)
+			flightModeService(custom_mode='AUTO.LAND')
+		except rospy.ServiceException, e:
+	   		print "service set_mode call failed: %s. Autoland Mode could not be set."%e
+
+
 
 class Controller:
 	""" Implements an altitude PID controller using velocity commands.
 	Allows to send altitude setpoints and velocity setpoints in XY plane
 	"""
 	def __init__(self):
+
+		# flight mode
+		self.mode = FcuModes() 
 
 		# flight mode
 		self.state = " "
@@ -64,6 +131,18 @@ class Controller:
 
 		self.pid = PID.PID(self.Kp, self.Ki, self.Kd)
 		self.pid.setSampleTime(self.Ts)
+
+	def armCb(self, msg):
+		self.mode.setArm()
+
+	def disarmCb(self,msg):
+		self.mode.setDisarm()
+
+	def offbCb(self, msg):
+		self.mode.setOffboardMode()
+
+	def landCb(self, msg):
+		self.mode.setAutoLandMode()
 
 	def posCb(self, msg):
 		self.local_pos.x = msg.pose.position.x
@@ -136,6 +215,12 @@ def main():
 	rospy.Subscriber("mavros/state", State, cnt.stateCb)
 	rospy.Subscriber("mavros/extedned_state", ExtendedState, cnt.landingStateCb)
 	rospy.Subscriber("~change_gains", Point, cnt.gainsCb)
+
+	# Subscriber:  commands
+	rospy.Subscriber("arm", Empty, cnt.armCb)
+	rospy.Subscriber("disarm", Empty, cnt.disarmCb)
+	rospy.Subscriber("land", Empty, cnt.landCb)
+	rospy.Subscriber("offb", Empty, cnt.offbCb)
 
 	# Setpoint publisher    
 	sp_pub = rospy.Publisher('mavros/setpoint_raw/local', PositionTarget, queue_size=1)
